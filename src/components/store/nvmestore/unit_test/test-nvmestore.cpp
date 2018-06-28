@@ -35,7 +35,7 @@ static Component::IKVStore::pool_t pool;
 namespace {
 
 // The fixture for testing class Foo.
-class KVStore_test : public ::testing::Test {
+class NVMEStore_test : public ::testing::Test {
 
  protected:
 
@@ -56,20 +56,22 @@ class KVStore_test : public ::testing::Test {
   static Component::IBlock_device * _block;
   static Component::IBlock_allocator * _alloc;
   static Component::IKVStore * _kvstore;
+  static Component::IZerocopy_memory * _zero_copy_mem;
 
   static std::string POOL_NAME;
 };
 
 
-Component::IKVStore * KVStore_test::_kvstore;
+Component::IKVStore * NVMEStore_test::_kvstore;
+Component::IZerocopy_memory * NVMEStore_test::_zero_copy_mem;
 
-std::string KVStore_test::POOL_NAME = "test-nvme";
+std::string NVMEStore_test::POOL_NAME = "test-nvme";
 
 #define PMEM_PATH "/mnt/pmem0/pool/0/"
 //#define PMEM_PATH "/dev/pmem0"
 
 
-TEST_F(KVStore_test, Instantiate)
+TEST_F(NVMEStore_test, Instantiate)
 {
   /* create object instance through factory */
   Component::IBase * comp = Component::load_component("libcomanche-nvmestore.so",
@@ -77,14 +79,18 @@ TEST_F(KVStore_test, Instantiate)
 
   ASSERT_TRUE(comp);
   IKVStore_factory * fact = (IKVStore_factory *) comp->query_interface(IKVStore_factory::iid());
+  IZerocopy_memory_factory * fact_memory = (IZerocopy_memory_factory *) comp->query_interface(IZerocopy_memory_factory::iid());
 
   // this nvme-store use a block device and a block allocator
   _kvstore = fact->create("owner","name");
+  _zero_copy_mem = fact_memory->create_memory_handler("owner", "name");
+  ASSERT_TRUE(_zero_copy_mem);
   
   fact->release_ref();
+  fact_memory->release_ref();
 }
 
-TEST_F(KVStore_test, OpenPool)
+TEST_F(NVMEStore_test, OpenPool)
 {
   PLOG(" test-nvmestore: try to openpool");
   ASSERT_TRUE(_kvstore);
@@ -94,7 +100,7 @@ TEST_F(KVStore_test, OpenPool)
   ASSERT_TRUE(pool > 0);
 }
 
-TEST_F(KVStore_test, BasicPut)
+TEST_F(NVMEStore_test, BasicPut)
 {
   ASSERT_TRUE(pool);
   std::string key = "MyKey";
@@ -105,31 +111,33 @@ TEST_F(KVStore_test, BasicPut)
   EXPECT_TRUE(S_OK == _kvstore->put(pool, key, value.c_str(), value.length()));
 }
 
-TEST_F(KVStore_test, GetDirect)
+TEST_F(NVMEStore_test, GetDirect)
 {
 
   /*Register Mem is only from gdr memory*/
   //ASSERT_TRUE(S_OK == _kvstore->register_direct_memory(user_buf, MB(8)));
   io_buffer_t handle;
-  Core::Physical_memory  mem_alloc; // aligned and pinned mem allocator, TODO: should be provided through IZerocpy Memory interface of NVMestore
+
+  assert(_zero_copy_mem);
+
   std::string key = "MyKey";
   void * value = nullptr;
   size_t value_len = 0;
 
-  handle = mem_alloc.allocate_io_buffer(MB(8), 4096, Component::NUMA_NODE_ANY);
+  handle = _zero_copy_mem->allocate_io_buffer(MB(8), 4096, Component::NUMA_NODE_ANY);
   ASSERT_TRUE(handle);
-  value = mem_alloc.virt_addr(handle);
+  value = _zero_copy_mem->virt_addr(handle);
 
   _kvstore->get_direct(pool, key, value, value_len, 0);
 
   EXPECT_FALSE(strcmp("Hello world!", (char*)value));
   PINF("Value=(%.50s) %lu", ((char*)value), value_len);
 
-  mem_alloc.free_io_buffer(handle);
+  _zero_copy_mem->free_io_buffer(handle);
 }
 
 
-TEST_F(KVStore_test, BasicGet)
+TEST_F(NVMEStore_test, BasicGet)
 {
   std::string key = "MyKey";
 
@@ -142,7 +150,7 @@ TEST_F(KVStore_test, BasicGet)
 }
 
 
-// TEST_F(KVStore_test, BasicGetRef)
+// TEST_F(NVMEStore_test, BasicGetRef)
 // {
 //   std::string key = "MyKey";
 
@@ -155,7 +163,7 @@ TEST_F(KVStore_test, BasicGet)
 
 #if 0
 
-TEST_F(KVStore_test, BasicMap)
+TEST_F(NVMEStore_test, BasicMap)
 {
   _kvstore->map(pool,[](uint64_t key,
                         const void * value,
@@ -167,13 +175,13 @@ TEST_F(KVStore_test, BasicMap)
 }
 #endif
 
-TEST_F(KVStore_test, BasicErase)
+TEST_F(NVMEStore_test, BasicErase)
 {
   _kvstore->erase(pool, "MyKey");
 }
 
 #if 0
-TEST_F(KVStore_test, Throughput)
+TEST_F(NVMEStore_test, Throughput)
 {
   ASSERT_TRUE(pool);
 
@@ -218,7 +226,7 @@ TEST_F(KVStore_test, Throughput)
 
 #if 0
 
-TEST_F(KVStore_test, Allocate)
+TEST_F(NVMEStore_test, Allocate)
 {
   uint64_t key_hash = 0;
   ASSERT_TRUE(_kvstore->allocate(pool, "Elephant", MB(8), key_hash) == S_OK);
@@ -245,20 +253,21 @@ TEST_F(KVStore_test, Allocate)
 #endif
 
 #ifdef DO_ERASE
-TEST_F(KVStore_test, ErasePool)
+TEST_F(NVMEStore_test, ErasePool)
 {
   _kvstore->delete_pool(pool);
 }
 #endif
 
-TEST_F(KVStore_test, ClosePool)
+TEST_F(NVMEStore_test, ClosePool)
 {
   _kvstore->close_pool(pool);
 }
 
-TEST_F(KVStore_test, ReleaseStore)
+TEST_F(NVMEStore_test, ReleaseStore)
 {
   _kvstore->release_ref();
+  _zero_copy_mem->release_ref();
 }
 
 

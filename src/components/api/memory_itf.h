@@ -110,6 +110,17 @@ public:
   
 };
 
+class IZerocopy_memory_factory : public Component::IBase
+{
+public:
+  DECLARE_INTERFACE_UUID(0xface829f,0x1993,0x4c19,0x9898,0xa3,0xae,0x21,0x5a,0x3e,0xe8);
+
+  virtual IZerocopy_memory * create_memory_handler(const std::string owner,
+                            const std::string name) = 0;
+
+};
+
+
 } /*< Component */
 
 #endif

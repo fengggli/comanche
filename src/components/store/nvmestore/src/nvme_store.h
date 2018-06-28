@@ -18,10 +18,12 @@
 #include <pthread.h>
 #include <common/rwlock.h>
 #include <common/types.h>
+#include <core/physical_memory.h>
 
 #include <api/kvstore_itf.h>
 
 #include "state_map.h"
+
 
 class State_map;
 
@@ -204,8 +206,47 @@ private:
   void init_block_allocator();
 };
 
+/* zeroy memory support*/
+class NVME_store_memory : public Core::Physical_memory, public Component::IZerocopy_memory{
 
-class NVME_store_factory : public Component::IKVStore_factory
+public:
+  /** 
+   * Constructor
+   */
+  NVME_store_memory(const std::string owner,
+             const std::string name): Core::Physical_memory(){};
+
+  /** 
+   * Destructor
+   * 
+   */
+  virtual ~NVME_store_memory(){};
+
+/** 
+   * Component/interface management
+   * 
+   */
+  DECLARE_VERSION(0.1);
+  DECLARE_COMPONENT_UUID(0x93564581,0x1993,0x4811,0xbdb2,0x19,0x57,0xa0,0xa6,0x84,0x57);
+  
+  void * query_interface(Component::uuid_t& itf_uuid) override {
+    if(itf_uuid == Component::IZerocopy_memory::iid()) {
+      return (void *) static_cast<Component::IZerocopy_memory*>(this);
+    }
+    else return NULL; // we don't support this interface
+  }
+
+  void unload() override {
+    delete this;
+  }
+  INLINE_FORWARDING_MEMORY_METHODS;
+};
+
+
+
+
+
+class NVME_store_factory : public Component::IKVStore_factory, public Component::IZerocopy_memory_factory
 {  
 public:
 
@@ -220,9 +261,11 @@ public:
     if(itf_uuid == Component::IKVStore_factory::iid()) {
       return (void *) static_cast<Component::IKVStore_factory*>(this);
     }
+    else if(itf_uuid == Component::IZerocopy_memory_factory::iid()) {
+      return (void *) static_cast<Component::IZerocopy_memory_factory*>(this);
+    }
     else return NULL; // we don't support this interface
   }
-
 
   void unload() override {
     delete this;
@@ -232,10 +275,21 @@ public:
                                        const std::string name)
                                        override
   {    
+    NVME_store * nvme_store = (new NVME_store(owner, name));
     Component::IKVStore * obj = static_cast<Component::IKVStore*>(new NVME_store(owner, name));   
     obj->add_ref();
     return obj;
   }
+
+  virtual Component::IZerocopy_memory * create_memory_handler(const std::string owner,
+                                       const std::string name)
+                                       override
+  {
+    Component::IZerocopy_memory * obj = static_cast<Component::IZerocopy_memory*>(new NVME_store_memory(owner, name));   
+    obj->add_ref();
+    return obj;
+  }
+
 };
 
 
