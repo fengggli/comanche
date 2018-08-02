@@ -6,7 +6,7 @@ if(Flatbuffers_FOUND)
 
 project(fuse-ustack CXX)
 
-include_directories(${Nanomsg_INCLUDE_DIRS} ${TBB_INCLUDE_DIRS} ${Flatbuffers_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}/src)
+include_directories(${Nanomsg_INCLUDE_DIRS} ${TBB_INCLUDE_DIRS} ${Flatbuffers_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG -D_FILE_OFFSET_BITS=64)
 
@@ -35,7 +35,6 @@ foreach(fs ${USTACK_FS})
 endforeach(fs ${USTACK_FS})
 
 # test for ustack client
-add_executable(iotest src/iotest.cpp)
-target_link_libraries(iotest ${ASAN_LIB} common comanche-core numa dl z ${Nanomsg_LIBRARIES} boost_system boost_program_options pthread ${TBB_LIBRARIES} fuse)
+add_subdirectory(unit_test)
 
 endif(Flatbuffers_FOUND)

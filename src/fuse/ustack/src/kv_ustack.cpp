@@ -39,12 +39,37 @@
 #include <api/kvstore_itf.h>
 
 #include "ustack.h"
-#include "ustack_client_ioctl.h"
+#include "ustack_ioctl.h"
 #include "kv_ustack_info.h"
 
 #define PMSTORE_PATH "libcomanche-pmstore.so"
 #define FILESTORE_PATH "libcomanche-storefile.so"
 #define NVMESTORE_PATH "libcomanche-nvmestore.so"
+
+/*
+ * Command line options
+ *
+ * We can't set default values for the char* fields here because
+ * fuse_opt_parse would attempt to free() them when the user specifies
+ * different values on the command line.
+ */
+static struct options {
+  const char *component;
+  const char *pci;
+  int show_help;
+} _options;
+
+#define OPTION(t, p)                            \
+  { t, offsetof(struct options, p), 1 }
+
+static const struct fuse_opt option_spec[] = {
+  OPTION("--component", component),
+  OPTION("--pci", pci),
+  OPTION("-h", show_help),
+  OPTION("--help", show_help),
+  FUSE_OPT_END
+};
+
 
 // ustack: the userspace zero copy communiation mechenism
 Ustack *_ustack;
@@ -64,7 +89,7 @@ void * kvfs_ustack_init (struct fuse_conn_info *conn){
   Component::IKVStore *store;
   Component::IBase * comp; 
 
-  std::string component("filestore");
+  std::string component(_options.component);
 
   if(component == "pmstore") {
     comp = Component::load_component(PMSTORE_PATH, Component::pmstore_factory);
@@ -81,7 +106,18 @@ void * kvfs_ustack_init (struct fuse_conn_info *conn){
 
   Component::IKVStore_factory * fact = (Component::IKVStore_factory *) comp->query_interface(Component::IKVStore_factory::iid());
 
-  store = fact->create("owner","name");
+  if(component == "nvmestore"){
+    try{
+      assert(std::string(_options.pci) != "null");
+      store = fact->create("owner","name", _options.pci);
+    }
+    catch(...){
+      throw General_exception("kvfs_ustack: cannot init nvme with pci address %s", _options.pci);
+    }
+  }
+  else{
+    store = fact->create("owner", "name");
+  }
   fact->release_ref();
 
   PINF("[%s]: fs loaded using component %s ", __func__, component.c_str());
@@ -93,6 +129,8 @@ void * kvfs_ustack_init (struct fuse_conn_info *conn){
   DPDK::eal_init(1024);
 
   _ustack = new Ustack(ustack_name.c_str(), info);
+
+  PINF("[%s]: kvfs daemon is started!", __func__);
   return info;
 }
 
@@ -282,8 +320,46 @@ static int kvfs_ustack_ioctl(const char *path, int cmd, void *arg,
 
 	return -EINVAL;
 }
-int main(int argc, char *argv[])
+
+
+static void show_help(const char *progname)
 {
+  printf("usage: %s [options] <mountpoint>\n\n", progname);
+  printf("File-system specific options:\n"
+         "    --component=<s>     kvstore component to use \"filestore\"/\"nvmestore\"\n"
+         "                        (default: \"filestore\")\n"
+         "    --pci=<s>           pci address if using nvmestore \n"
+         "                        (e.g. \"81:00.0\", default \"null\")\n"
+         "\n");
+}
+
+int main(int argc, char *argv[])
+{  
+  struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+  /* Set defaults -- we have to use strdup so that
+     fuse_opt_parse can free the defaults if other
+     values are specified */
+  _options.component = strdup("filestore");
+  _options.pci = strdup("null");
+  /* Parse options */
+  if (fuse_opt_parse(&args, &_options, option_spec, NULL) == -1)
+    return 1;
+  /* When --help is specified, first print our own file-system
+     specific help text, then signal fuse_main to show
+     additional help (by adding `--help` to the options again)
+     without usage: line (by setting argv[0] to the empty
+     string) */
+  if (_options.show_help) {
+    show_help(argv[0]);
+    assert(fuse_opt_add_arg(&args, "--help") == 0);
+    args.argv[0] = (char*) "";
+  }
+  PINF("DEBUG:");
+  PINF("options.component = %s", _options.component);
+  if (!strcmp(_options.component, "nvmestore") && !strcmp(_options.pci, "null")) {
+    PERR("kv_ustack: use --pci for nvmestore");
+  }
+
   static struct fuse_operations oper;
   memset(&oper, 0, sizeof(struct fuse_operations));
 	oper.getattr	= kvfs_ustack_getattr;

@@ -10,7 +10,7 @@
 #include <core/avl_malloc.h>
 #include <core/xms.h>
 
-#include "ustack_client_ioctl.h"
+#include "ustack_ioctl.h"
 #include "protocol_generated.h"
 #include "protocol_channel.h"
 
@@ -22,8 +22,6 @@
  */
 class IO_memory_allocator : private Core::Region_allocator
 {
-   std::string MOUNT_ROOT="/home/fengggli/comanche/build/mymount";
-
 public:
   IO_memory_allocator(addr_t phys_base, size_t n_bytes) :
     _phys_base(phys_base),    

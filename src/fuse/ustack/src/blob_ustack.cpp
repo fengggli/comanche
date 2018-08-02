@@ -1,5 +1,6 @@
 /*
   FUSE: Filesystem in Userspace wrapper for Ustack-Store
+  This is deprecated, now we use key-value instead blob as the backend of ustack-fs
 */
 #define FUSE_USE_VERSION 26
 //#define USE_NVME_DEVICE

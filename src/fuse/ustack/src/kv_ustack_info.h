@@ -2,7 +2,7 @@
  * Description:
  *
  * First created: 2018 Jul 11
- * Last modified: 2018 Jul 12
+ * Last modified: 2018 Aug 02
  *
  * Author: Feng Li
  * e-mail: fengggli@yahoo.com
@@ -17,9 +17,11 @@
 #include <api/kvstore_itf.h>
 
 /*
- * private information for this mounting.
- * Allocate the fuse daemon internal fh; interact with kvstore
+ * Information for fast path:
+ *  1. mapping: <fuse_fh, key>, assuming each file corrosponds to a object in the key-value stoer
+ *  2. key_value store: manages the creation/deletion/operation of key-value store
  */
+
 class KV_ustack_info{
 using pool_t     = uint64_t;
   public:
@@ -29,10 +31,20 @@ using pool_t     = uint64_t;
 
     KV_ustack_info(const std::string owner, const std::string name, Component::IKVStore *store)
       :_owner(owner), _name(name), _store(store), _asigned_ids(0){
+      std::string pool_path = "/mnt/pmem0";
+      std::string pool_name = "pool-kvfs-simple";
 
+      try{
+        _pool = _store->create_pool(pool_path, pool_name, MB(12));
+      }
+      catch(...){
 
-      _pool = _store->create_pool("/mnt/pmem0", "pool-kvfs-simple", MB(12));
-("");
+        _pool = _store->open_pool(pool_path, pool_name);
+      }
+
+      if(_pool == 0){
+        throw General_exception("Cannot create or open pool at ", pool_path.c_str(), pool_name.c_str());
+      }
     }
 
     ~KV_ustack_info(){
