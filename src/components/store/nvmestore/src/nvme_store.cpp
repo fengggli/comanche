@@ -361,7 +361,7 @@ status_t NVME_store::put(IKVStore::pool_t pool,
 
   /* TODO: increase IO buffer sizes when value size is large*/
   if(value_len > mem_size){
-    throw General_exception("Object size larger than MB(8)!");
+    throw General_exception("Object size larger than per-session IO_memory size %lu!", mem_size);
   }
 
   size_t nr_io_blocks = (value_len+ BLOCK_SIZE -1)/BLOCK_SIZE;
