@@ -19,7 +19,7 @@ file(GLOB SOURCES src/*.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
-target_link_libraries(${PROJECT_NAME} ${ASAN_LIB} common comanche-core dl rt pthread numa rdmacm ibverbs uuid )
+target_link_libraries(${PROJECT_NAME} ${ASAN_LIB} common comanche-core dl rt pthread numa uuid )
 
 # set the linkage in the install/lib
 set_target_properties(${PROJECT_NAME} PROPERTIES 

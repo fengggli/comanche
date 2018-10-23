@@ -78,27 +78,30 @@ TEST_F(Block_nvme_test, InstantiateBlockDevice)
   PINF("nvme-based block-layer component loaded OK.");
 }
 
-#if 0
+#if 1
 TEST_F(Block_nvme_test, PartitionIntegrity)
 {
   using namespace Component;
   
-  io_buffer_t mem = _block->allocate_io_buffer(4096,4096,Component::NUMA_NODE_ANY);
+  Component::VOLUME_INFO devinfo;
+  _block->get_volume_info(devinfo);
+
+  size_t block_size = devinfo.block_size;
+  PINF("allocate 1 block with blocksize=%u", devinfo.block_size);
+  io_buffer_t mem = _block->allocate_io_buffer(block_size,block_size,Component::NUMA_NODE_ANY);
   void * ptr = _block->virt_addr(mem);
   unsigned ITERATIONS = 1000000;
 
-  VOLUME_INFO vinfo;
-  _block->get_volume_info(vinfo);
   
-  PLOG("Volume Info: size=%ld blocks", vinfo.max_lba);
-  PLOG("             block_size=%u", vinfo.block_size);
-  PLOG("             name=%s", vinfo.volume_name);
+  PLOG("Volume Info: size=%ld blocks", devinfo.block_count);
+  PLOG("             block_size=%u", devinfo.block_size);
+  PLOG("             name=%s", devinfo.volume_name);
 
   //  unsigned BLOCK_COUNT = vinfo.max_lba;
   unsigned BLOCK_COUNT = 20000; // limit size
 
   /* zero blocks first */
-  memset(ptr,0,4096);
+  memset(ptr,0,block_size);
 
   uint64_t tag;
 
@@ -144,8 +147,15 @@ TEST_F(Block_nvme_test, PartitionIntegrity)
 TEST_F(Block_nvme_test, Throughput)
 {
   using namespace Component;
+
+
+  Component::VOLUME_INFO devinfo;
+  _block->get_volume_info(devinfo);
+
+  size_t block_size = devinfo.block_size;
+  PINF("allocate 1 block with blocksize=%u", devinfo.block_size);
   
-  io_buffer_t mem = _block->allocate_io_buffer(4096,4096,Component::NUMA_NODE_ANY);
+  io_buffer_t mem = _block->allocate_io_buffer(block_size,block_size,Component::NUMA_NODE_ANY);
   
   unsigned ITERATIONS = 1000000;
   uint64_t tag;
