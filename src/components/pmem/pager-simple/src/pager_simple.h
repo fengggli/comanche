@@ -31,6 +31,9 @@ class Simple_pager_component : public Component::IPager
 private:
   static constexpr bool option_DEBUG = false;
 
+  // TODO this assumes you handle one fault each time
+  static constexpr size_t NUM_STAGING_PAGES = 1; // staging pages is for async io
+
 public:
 
   /** 

@@ -63,14 +63,19 @@ public:
     return vaddr;
   }
 
+  /*
+   * give the lba of mapped block
+   * for 512 lba size, 1 memory page will be mapped to 4 blocks and lba will refer to  the first 512 block
+   */
   IBlock_device * lookup(addr_t vaddr, addr_t& lba) {
+    size_t bs = _rm->block_size();
 
     if(!vaddr)
       throw API_exception("%s: bad param", __PRETTY_FUNCTION__);
     
     for(range_t& r: _table) {
       if(vaddr >= r.start && vaddr <= r.end) {
-        lba = (vaddr - r.start) / PAGE_SIZE;
+        lba = ((vaddr - r.start) / PAGE_SIZE)*(PAGE_SIZE/bs);
         return r.blkitf;
       }
     }
@@ -144,7 +149,12 @@ Simple_pager_component::~Simple_pager_component()
       addr_t lba;
       IBlock_device * bd = _tracker->lookup(_pages[slot].vaddr, lba);
       assert(bd);
-      bd->write(_iob, buffer_offset, lba, 1);
+      // TODO need
+      size_t bs = _rm->block_size();
+      size_t blks_per_page = PAGE_SIZE/bs;
+      for(size_t i = 0; i< blks_per_page; i++ ){
+        bd->write(_iob, buffer_offset + bs*i , lba+i, 1);
+      }
     }
   }
   
@@ -167,7 +177,7 @@ init_memory(size_t nr_pages)
   _nr_pages = nr_pages;
 
   /* set up IO memory */
-  _iob = _block_dev->allocate_io_buffer(PAGE_SIZE * nr_pages,
+  _iob = _block_dev->allocate_io_buffer(PAGE_SIZE * (nr_pages+ NUM_STAGING_PAGES),
                                         PAGE_SIZE,
                                         NUMA_NODE_ANY);
   _phys_base = _block_dev->phys_addr(_iob);
@@ -181,7 +191,9 @@ init_memory(size_t nr_pages)
     _pages[i].paddr  = phys;
     _pages[i].vaddr  = 0;
     //    _pages.push_back(phys);
-    PLOG("[simple-pager]: added phys page %lx", phys);
+    if(option_DEBUG){
+        PLOG("[simple-pager]: added phys page %lx", phys);
+    }
     phys+= PAGE_SIZE;
   }
 
@@ -203,6 +215,7 @@ Simple_pager_component::
 request_page(addr_t virt_addr_faulted,
              addr_t *out_phys_addr_map,
              addr_t *out_virt_addr_evict)
+             //bool write_fault)
 {
   if(option_DEBUG)
     PINF("PF#: virt=%lx", virt_addr_faulted);
@@ -220,9 +233,11 @@ request_page(addr_t virt_addr_faulted,
   
   /* select page to evict */
   unsigned slot = _request_num % _nr_pages;
+  // use the direct mapping
+  //unsigned slot = (virt_addr_faulted >> PAGE_SHIFT_4K) % _nr_pages;
   _request_num++;
 
-  //#define FORCE_SYNC // TESTING ONLY
+//#define FORCE_SYNC // TESTING ONLY
 #ifndef FORCE_SYNC // TESTING ONLY
   if(_pages[slot].gwid) {
 #ifndef DISABLE_IO
@@ -232,41 +247,95 @@ request_page(addr_t virt_addr_faulted,
     }
     _pages[slot].gwid = 0;
 #endif
-    if(option_DEBUG)
-      PLOG("swapping out: vaddr evict=%p", (void*) *out_virt_addr_evict);
   }
 #endif
   *out_virt_addr_evict = _pages[slot].vaddr;
+
+    if(option_DEBUG)
+      PLOG("swapping out: vaddr evict=%p", (void*) *out_virt_addr_evict);
 
   
 #ifndef DISABLE_IO
   addr_t lba;
   IBlock_device * bd = nullptr;
+
   uint64_t buffer_offset = PAGE_SIZE * slot;
+  // evicted page is copied to the staging page first then the async io is issued
+  uint64_t staging_buffer_offset = PAGE_SIZE * _nr_pages;
   /* swap out */
   {
     if(_pages[slot].vaddr > 0) {
+
+      // TODO: change the record the lba of
       bd = _tracker->lookup(_pages[slot].vaddr, lba);
       
       /* issue async write-back */
 #ifndef FORCE_SYNC // TESTING only.
-      // TODO: io buffer not protected!
-      _pages[slot].gwid = bd->async_write(_iob, buffer_offset, lba,1);
+      // TODO:
+      // 1. support for 512 lba size
+      // 2. staging page should be mapped?
+      void * staging_page =  (void *)(_iob+ staging_buffer_offset);
+      memcpy( staging_page, (void *)(_pages[slot].vaddr), PAGE_SIZE);
+      //_pages[slot].gwid = bd->async_write(_iob, staging_buffer_offset, lba, 1);
+      uint64_t last_wid=-1;
+      size_t bs = _rm->block_size();
+      size_t blks_per_page = PAGE_SIZE/bs;
+      for(size_t i = 0; i< blks_per_page; i++ ){
+        last_wid=bd->async_write(_iob, staging_buffer_offset + bs*i , lba + i, 1);
+      }
+      _pages[slot].gwid = last_wid;
+
 #else
-      bd->write(_iob, buffer_offset, lba, 1);
+
+      size_t bs = _rm->block_size();
+      size_t blks_per_page = PAGE_SIZE/bs;
+      for(size_t i = 0; i< blks_per_page; i++ ){
+        bd->write(_iob, buffer_offset + bs*i , lba + i, 1);
+      }
+
 #endif
     }
   }
   /* swap in */
+  //TODO: do we need to swap in if it's a write?
+  // Instead, we can just map the page and set the mapping directly
   {
     //    _tracker->dump_info();
     /* issue synchronous read */
     bd = _tracker->lookup(virt_addr_faulted, lba);
-    if(option_DEBUG)
-      PLOG("swapping in: vaddr=0x%lx lba=0x%lx", virt_addr_faulted, lba);
+    //if(!write_fault){
+		if(1){
 
-    // TODO: io buffer can be corrupted
-    bd->read(_iob, buffer_offset, lba, 1);
+        if(option_DEBUG)
+          PLOG("swapping in: vaddr=0x%lx lba=0x%lx", virt_addr_faulted, lba);
+
+#if 1
+
+      size_t bs = _rm->block_size();
+      
+      size_t blks_per_page = PAGE_SIZE/bs;
+
+#ifndef FORCE_SYNC // for 512 io size, this is much faster!
+          uint64_t last_wid=-1;
+          for(size_t i = 0; i< blks_per_page; i++ ){
+            last_wid = bd->async_read(_iob, buffer_offset + bs*i , lba+ i, 1);
+          }
+
+          while(!bd->check_completion(last_wid)) {          cpu_relax();}
+#else
+
+        for(size_t i = 0; i< blks_per_page; i++ ){
+            bd->read(_iob, buffer_offset + bs*i , lba+ i, 1);
+        }
+#endif
+
+
+#else
+
+      uint64_t tag = bd->async_read(_iob, buffer_offset, lba, 1);
+      while(!bd->check_completion(tag)) {          cpu_relax();}
+#endif
+    }
   }
 #endif
   
@@ -275,7 +344,7 @@ request_page(addr_t virt_addr_faulted,
   assert(*out_phys_addr_map > 0);
   
   if(option_DEBUG) {
-     PLOG("resolve pf response: phys=%lx evict=%lx", *out_phys_addr_map, *out_virt_addr_evict);
+     PLOG("resolve pf response: phys=%lx evict=%lx, _request_num=%lx", *out_phys_addr_map, *out_virt_addr_evict, _request_num);
   }
 }
 
@@ -320,7 +389,12 @@ flush(addr_t vaddr, size_t size)
       addr_t lba;
       IBlock_device * bd = _tracker->lookup(_pages[slot].vaddr, lba);
       assert(bd);
-      bd->write(_iob, buffer_offset, lba, 1);
+
+      size_t bs = _rm->block_size();
+      size_t blks_per_page = PAGE_SIZE/bs;
+      for(size_t i = 0; i< blks_per_page; i++ ){
+         bd->write(_iob, buffer_offset + bs*i, lba+ i, 1);
+      }
     }
   }    
 }
