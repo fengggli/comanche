@@ -15,6 +15,11 @@
 
 using namespace Component;
 
+enum{
+  RESERVE_NONE=0,
+  RESERVE_SMALL=1000,
+  RESERVE_MEDIUM=100000
+};
 
 /** 
  * Map vaddr to a block device
@@ -26,10 +31,14 @@ using namespace Component;
 class Range_tracker
 {
 public:
-  Range_tracker(IRegion_manager * rm, std::string owner,std::string heap_set_id, size_t max_nr_pages) :
-    _rm(rm), _owner(owner), _heap_set_id(heap_set_id), max_nr_pages(max_nr_pages)
+  /* cnt_reserve: pre-reserve some space for vector so it wont grow, which trigger would more allocations*/
+  Range_tracker(IRegion_manager * rm, std::string owner,std::string heap_set_id, int cnt_reserve= RESERVE_NONE) :
+    _rm(rm), _owner(owner), _heap_set_id(heap_set_id)
   {
     assert(_rm);
+    if(cnt_reserve){
+      _table.reserve(cnt_reserve);
+    }
     _rm->add_ref();   
   }
   virtual ~Range_tracker() { _rm->release_ref(); }
@@ -41,13 +50,6 @@ public:
     uint64_t nblocks = size / bs;
     if(size % bs) nblocks++;
 
-    /* are there enough backed phys pages? */
-    /*this is fine*/
-    if(nblocks > max_nr_pages){
-        PINF("%s: requested nr_pages(0x%lx) > nr_phs_pages (0x%lx)",
-                            __PRETTY_FUNCTION__, nblocks, max_nr_pages);
-    }
-    
     addr_t vaddr;
     IBlock_device * bd = _rm->reuse_or_allocate_region(nblocks,
                                                        _owner,
@@ -95,7 +97,6 @@ private:
   std::string _owner;
   std::string _heap_set_id;
   std::vector<range_t> _table;
-  size_t max_nr_pages; // max nr_pages, decided by the backed blk device
 };
 
 Simple_pager_component::
@@ -129,7 +130,7 @@ Simple_pager_component(size_t nr_pages,
   init_memory(nr_pages);
 
   /* initialize range tracker */
-  _tracker = new Range_tracker(_rm, "myTiger", heap_set_id, nr_pages);
+  _tracker = new Range_tracker(_rm, "myTiger", heap_set_id, RESERVE_MEDIUM);
 
   PINF("Part-region component loaded OK.");
 }
@@ -279,6 +280,7 @@ request_page(addr_t virt_addr_faulted,
 }
 
 
+/* TODO: this check will be expensive!*/
 void
 Simple_pager_component::
 clear_mappings(addr_t vaddr, size_t size)

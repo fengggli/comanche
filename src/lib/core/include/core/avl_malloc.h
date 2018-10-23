@@ -35,6 +35,9 @@
 #include <vector>
 #include "avl_tree.h"
 
+
+#define USE_RECURSION  // recursion breaks the stack for large trees
+
 namespace Core
 {
 /** 
