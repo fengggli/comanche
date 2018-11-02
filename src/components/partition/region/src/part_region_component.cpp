@@ -19,7 +19,7 @@ public:
     _last_lba(last_lba),
     _volume_name(volume_name)
   {    
-    PINF("Region session (%s) %lu-%lu (lower=%p)", volume_name.c_str(), first_lba, last_lba, lower_layer);
+    PLOG("Region session (%s) %lu-%lu (lower=%p)", volume_name.c_str(), first_lba, last_lba, lower_layer);
     
     if(last_lba < first_lba)
       throw Constructor_exception("invalid params (last_lba < first_lba)");

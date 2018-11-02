@@ -152,9 +152,7 @@ Simple_pager_component::~Simple_pager_component()
       // TODO need
       size_t bs = _rm->block_size();
       size_t blks_per_page = PAGE_SIZE/bs;
-      for(size_t i = 0; i< blks_per_page; i++ ){
-        bd->write(_iob, buffer_offset + bs*i , lba+i, 1);
-      }
+      bd->write(_iob, buffer_offset , lba, blks_per_page);
     }
   }
   
@@ -280,18 +278,14 @@ request_page(addr_t virt_addr_faulted,
       uint64_t last_wid=-1;
       size_t bs = _rm->block_size();
       size_t blks_per_page = PAGE_SIZE/bs;
-      for(size_t i = 0; i< blks_per_page; i++ ){
-        last_wid=bd->async_write(_iob, staging_buffer_offset + bs*i , lba + i, 1);
-      }
+      last_wid=bd->async_write(_iob, staging_buffer_offset , lba, blks_per_page);
       _pages[slot].gwid = last_wid;
 
 #else
 
       size_t bs = _rm->block_size();
       size_t blks_per_page = PAGE_SIZE/bs;
-      for(size_t i = 0; i< blks_per_page; i++ ){
-        bd->write(_iob, buffer_offset + bs*i , lba + i, 1);
-      }
+      bd->write(_iob, buffer_offset, lba, blks_per_page);
 
 #endif
     }
@@ -317,16 +311,12 @@ request_page(addr_t virt_addr_faulted,
 
 #ifndef FORCE_SYNC // for 512 io size, this is much faster!
           uint64_t last_wid=-1;
-          for(size_t i = 0; i< blks_per_page; i++ ){
-            last_wid = bd->async_read(_iob, buffer_offset + bs*i , lba+ i, 1);
-          }
+          last_wid = bd->async_read(_iob, buffer_offset , lba, blks_per_page);
 
           while(!bd->check_completion(last_wid)) {          cpu_relax();}
 #else
 
-        for(size_t i = 0; i< blks_per_page; i++ ){
-            bd->read(_iob, buffer_offset + bs*i , lba+ i, 1);
-        }
+          bd->read(_iob, buffer_offset , lba, blks_per_page);
 #endif
 
 
@@ -392,9 +382,7 @@ flush(addr_t vaddr, size_t size)
 
       size_t bs = _rm->block_size();
       size_t blks_per_page = PAGE_SIZE/bs;
-      for(size_t i = 0; i< blks_per_page; i++ ){
-         bd->write(_iob, buffer_offset + bs*i, lba+ i, 1);
-      }
+      bd->write(_iob, buffer_offset, lba, blks_per_page);
     }
   }    
 }

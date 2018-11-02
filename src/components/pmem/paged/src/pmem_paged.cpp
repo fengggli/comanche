@@ -133,7 +133,7 @@ bool Pmem_paged_component::pf_handler(addr_t fault_addr)
       throw General_exception("%s: mprotect failed (%p) rc=%d",
                               __PRETTY_FUNCTION__, (void*)evict_vaddr, errno);
   }
-  /* map new page */
+  /* map new page, this will override previous empty mapping */
   void  * ptr = ::mmap((void*) page,
                        PAGE_SIZE,
                        PROT_READ | PROT_WRITE,
@@ -176,9 +176,7 @@ open(std::string id, size_t size, int numa_node, bool& reused, void*& vptr)
 
   if(option_DEBUG)
     PLOG("Address returned by mmap() = %p", addr);
-
-  vptr = addr;
-
+vptr = addr; 
   /* record size of allocation */
   {
     std::lock_guard<std::mutex> g(_size_map_lock);

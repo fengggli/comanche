@@ -5,7 +5,8 @@ add_subdirectory(./unit_test)
 
 project(comanche-pagersimple CXX)
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+#add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_definitions(${GCC_COVERAGE_COMPILE_FLAGS})
 
 file(GLOB SOURCES src/*.c*)
 

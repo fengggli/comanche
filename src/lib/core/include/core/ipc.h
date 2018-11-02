@@ -52,7 +52,7 @@ class IPC_server
 {
 private:
   static const auto     MAX_MSG_SIZE = 1024;
-  static constexpr bool option_DEBUG = false;
+  static constexpr bool option_DEBUG = true;
 
 private:
   std::string           _url;
@@ -214,7 +214,7 @@ class IPC_client
 {
 private:
   static constexpr auto MAX_REPLY_SIZE = 1024;
-  static constexpr bool option_DEBUG   = false;
+  static constexpr bool option_DEBUG   = true;
 
 public:
   /** 

@@ -45,7 +45,8 @@ class Region_table
 {
 private:
   static constexpr uint32_t REGION_MAGIC = 0x1DEA;
-  static constexpr size_t   METADATA_FOOTPRINT = KB(4) * 1; //32;
+  //static constexpr size_t   METADATA_FOOTPRINT = KB(4) * 1; //32;
+  static constexpr size_t   METADATA_FOOTPRINT = KB(64) * 1; //512;
   static constexpr addr_t   VADDR_BASE = 0x900000000ULL;
   static constexpr bool option_DEBUG = true;
   
@@ -61,12 +62,15 @@ public:
                                             _vi.block_size,/* alignment */
                                             Component::NUMA_NODE_ANY);
 
+
     
     assert(METADATA_FOOTPRINT % _vi.block_size == 0);
     _md_size_in_blocks = METADATA_FOOTPRINT / _vi.block_size;
 
     if(METADATA_FOOTPRINT % _vi.block_size)
       _md_size_in_blocks++;
+
+    PINF("[region table]: use block_size=%lu metadata_footprint %lu, md_size_in_blocks %lu", _vi.block_size, METADATA_FOOTPRINT,  _md_size_in_blocks);
     
     _table = static_cast<__region_table_t *>(device->virt_addr(_io_buffer));
       
@@ -259,8 +263,11 @@ public:
 
     _table->num_entries++;
 
-    dump();
-    flush();
+
+    if(option_DEBUG){
+      dump();
+    }
+    //flush();
     return &_table->entries[i];
   }
 

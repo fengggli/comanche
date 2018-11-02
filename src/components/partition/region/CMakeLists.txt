@@ -7,7 +7,8 @@ project(comanche-partregion CXX)
 
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 
-add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+#add_definitions(${GCC_COVERAGE_COMPILE_FLAGS} -DCONFIG_DEBUG)
+add_definitions(${GCC_COVERAGE_COMPILE_FLAGS})
 
 file(GLOB SOURCES src/*.cpp)
 
