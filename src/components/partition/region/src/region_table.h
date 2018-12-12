@@ -265,9 +265,9 @@ public:
 
 
     if(option_DEBUG){
-      dump();
     }
-    //flush();
+    dump();
+    flush();
     return &_table->entries[i];
   }
 
