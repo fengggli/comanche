@@ -33,6 +33,7 @@
 #include <common/exceptions.h>
 #include <common/utils.h>
 #include <core/stacktrace.h>
+#include <config_comanche.h>
 
 #include <cxxabi.h>    // for __cxa_demangle
 #include <dlfcn.h>     // for dladdr
@@ -165,11 +166,19 @@ Component::io_buffer_t Physical_memory::register_memory_for_io(void* vaddr,
 
   int rc = spdk_mem_register(vaddr, len);
 
-  if (spdk_vtophys(vaddr) != paddr)
+  addr_t out_paddr;
+#ifdef USE_DPDK_1905
+  size_t out_len = 0;
+  out_paddr = spdk_vtophys(vaddr, &out_len);
+  if (out_paddr != paddr || out_len <= 0)
+#else
+  out_paddr = spdk_vtophys(vaddr);
+  if (out_paddr != paddr)
+#endif
     throw General_exception(
         "SPDK address registration check failed (rc=%d), spdk_vtophys returns "
         "physcial address 0x%lx != 0x%lx",
-        rc, spdk_vtophys(vaddr), paddr);
+        rc, out_paddr, paddr);
 
   return reinterpret_cast<Component::io_buffer_t>(vaddr);
 }
@@ -203,7 +212,15 @@ void* Physical_memory::virt_addr(Component::io_buffer_t buffer) {
  * @return
  */
 addr_t Physical_memory::phys_addr(Component::io_buffer_t buffer) {
-  return spdk_vtophys(reinterpret_cast<void*>(buffer));
+  addr_t out_paddr;
+  void * vaddr = (reinterpret_cast<void*>(buffer));
+#ifdef USE_DPDK_1905
+  size_t out_len;
+  out_paddr = spdk_vtophys(vaddr, &out_len);
+#else
+  out_paddr = spdk_vtophys(vaddr);
+#endif
+  return out_paddr;
 }
 
 /**

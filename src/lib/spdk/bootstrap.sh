@@ -4,9 +4,14 @@
 #
 echo "Boot-strapping SPDK ..."
 
+SPDK_VERSION=$2
+
+DPDK_INSTALL_DIR="$1/share/dpdk/x86_64-native-linuxapp-gcc/"
+
+
 if [ ! -d ./spdk ] ; then
-    git clone -b v18.10 https://github.com/spdk/spdk.git
+    git clone -b $SPDK_VERSION https://github.com/spdk/spdk.git
 fi
 
-cd spdk ; ./configure --with-dpdk=$1/share/dpdk/x86_64-native-linuxapp-gcc/ --without-vhost --without-virtio
-make DPDK_DIR=$1/share/dpdk/x86_64-native-linuxapp-gcc/ CONFIG_RDMA=y
+cd spdk ; ./configure --with-dpdk=${DPDK_INSTALL_DIR} --without-vhost --without-virtio
+make DPDK_DIR=${DPDK_INSTALL_DIR} CONFIG_RDMA=y

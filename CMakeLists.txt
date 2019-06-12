@@ -31,6 +31,16 @@ set(CONF_COMANCHE_HOME ${CMAKE_CURRENT_SOURCE_DIR})
 # override this at cmake time with 'cmake -DCMAKE_INSTALL_PREFIX:PATH=/foo ..'
 set(CONF_COMANCHE_INSTALL ${CMAKE_INSTALL_PREFIX})
 
+option(USE_DPDK_1905 "USE new version of dpdk and spdk to support external memory registration" ON)# used by lib/dpdk and lib/spdk
+
+if(USE_DPDK_1905)
+  set(DPDK_VERSION "dpdk-19.05")
+  set(SPDK_VERSION "v19.04")
+else()
+  set(DPDK_VERSION "dpdk-18.08")
+  set(SPDK_VERSION "v18.10")
+endif()
+
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config_comanche.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/config_comanche.h"

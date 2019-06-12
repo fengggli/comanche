@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <config_comanche.h>
 
 using namespace std;
 
@@ -104,7 +105,14 @@ public:
     if(spdk_mem_register(_base, _len))
       throw General_exception("spdk_mem_register failed");
 
+#ifdef USE_DPDK_1905
+    size_t out_len = 0;
+    _phys_base = spdk_vtophys(_base, &out_len);
+    if(out_len <= 0)
+      throw General_exception("spdk_vtophys failed");
+#else
     _phys_base = spdk_vtophys(_base);
+#endif
   }
 
   ~Pmem_allocator() {
