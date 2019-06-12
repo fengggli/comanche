@@ -19,11 +19,16 @@
 #include <common/logging.h>
 #include <gtest/gtest.h>
 #include <string>
+#include <core/physical_memory.h>
+#include <core/dpdk.h>
 
 #include <api/block_itf.h>
 #include <api/components.h>
 #include <api/fs_itf.h>
 #include <component/base.h>
+
+#define USE_BARE_ALLOC
+#define SKIP_INIT
 
 using namespace Component;
 
@@ -56,6 +61,8 @@ class Block_nvme_test : public ::testing::Test {
 Component::IBlock_device *Block_nvme_test::_block;
 
 TEST_F(Block_nvme_test, InstantiateBlockDevice) {
+
+#ifndef SKIP_INIT
   Component::IBase *comp = Component::load_component(
       "libcomanche-blknvme.so", Component::block_nvme_factory);
   assert(comp);
@@ -72,6 +79,39 @@ TEST_F(Block_nvme_test, InstantiateBlockDevice) {
   assert(_block);
   fact->release_ref();
   PINF("nvme-based block-layer component loaded OK.");
+
+#else
+DPDK::eal_init(48);
+#endif
+}
+
+
+TEST_F(Block_nvme_test, MemoryAllocation) {
+  std::vector<Component::io_buffer_t> v_iobs;
+
+  Core::Physical_memory alloc;
+  for (unsigned i = 0; i < 10; i++) {
+#ifndef USE_BARE_ALLOC
+    auto iob = _block->allocate_io_buffer(rand() % KB(64), 4096,
+                                        Component::NUMA_NODE_ANY);
+#else
+    auto iob = alloc.allocate_io_buffer(rand() % KB(64), 4096,
+                                        Component::NUMA_NODE_ANY);
+#endif
+    v_iobs.push_back(iob);
+  }
+
+  unsigned i = 0;
+  for (auto& iob : v_iobs) {
+    PINF("tring to free no.%u buffer", i++);
+    // getchar();
+
+#ifndef USE_BARE_ALLOC
+    _block->free_io_buffer(iob);
+#else
+    alloc.free_io_buffer(iob);
+#endif
+  }
 }
 
 #if 0
@@ -136,7 +176,7 @@ TEST_F(Block_nvme_test, PartitionIntegrity)
 #endif
 
 #if 1
-TEST_F(Block_nvme_test, Throughput) {
+TEST_F(Block_nvme_test, DISABLED_Throughput) {
   using namespace Component;
 
   io_buffer_t mem =

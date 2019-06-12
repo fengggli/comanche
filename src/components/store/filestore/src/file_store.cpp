@@ -31,7 +31,7 @@
 
 #include "file_store.h"
 
-//#define USE_DPDK
+#define USE_DPDK
 
 #ifdef USE_DPDK
 #include <core/dpdk.h>
@@ -41,7 +41,7 @@
 #ifdef USE_DPDK
 static void __attribute__((constructor)) ctor(void) 
 {
-  DPDK::eal_init(4*1024); // limit 4 GiB
+  DPDK::eal_init(1024); // limit 4 GiB
 } 
 #endif
 

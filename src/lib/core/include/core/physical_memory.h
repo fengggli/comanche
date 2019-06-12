@@ -36,7 +36,7 @@ namespace Core
 {
 class Physical_memory {
  private:
-  static constexpr bool option_DEBUG = false; /*< leak detection helper */
+  static constexpr bool option_DEBUG = true; /*< leak detection helper */
 
  public:
   /**

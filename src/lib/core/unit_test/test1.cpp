@@ -51,13 +51,16 @@ TEST_F(Core_test, MemoryAllocation) {
   Core::Physical_memory alloc;
   std::vector<Component::io_buffer_t> v_iobs;
 
-  for (unsigned i = 0; i < 100; i++) {
+  for (unsigned i = 0; i < 1; i++) {
     auto iob = alloc.allocate_io_buffer(rand() % KB(64), 4096,
                                         Component::NUMA_NODE_ANY);
     v_iobs.push_back(iob);
   }
 
+  unsigned i = 0;
   for (auto& iob : v_iobs) {
+    PINF("tring to free no.%u buffer", i++);
+    getchar();
     alloc.free_io_buffer(iob);
   }
 }
