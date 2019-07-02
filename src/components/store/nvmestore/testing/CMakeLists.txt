@@ -7,3 +7,5 @@ target_link_libraries(test-memory-master ${ASAN_LIB} common comanche-core numa p
 
 add_executable(test-memory-slave test-memory-slave.cpp)
 target_link_libraries(test-memory-slave  ${ASAN_LIB} common comanche-core numa pthread gtest dl comanche-allocblock profiler nupm)
+
+add_subdirectory(mcas-nvmestore)
