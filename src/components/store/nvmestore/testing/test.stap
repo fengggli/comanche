@@ -1,0 +1,66 @@
+// ps aux|grep mcas|head -1 |awk '{print $2}' | sudo env "PATH=$PATH" xargs -I{} stap test.tap  -x {}
+
+probe begin{
+  printf("systemtap started\n")
+}
+
+probe kernel.function("__get_user_pages")
+{
+printf("__get_user_pages mm %p start %lu nr_pages %lu gup_flags 0x%lx\n", $mm, $start, $nr_pages, $gup_flags);
+}
+
+/*probe kernel.statement("__get_user_pages@mm/gup.c:650")*/
+/*{*/
+  /*printf("__get_user_pages 650 $vma %p 0x%lx\n", $vma, $gup_flags);*/
+  /*if ( $vma ) {*/
+  /*printf("vm_flags 0x%lx\n", $vma->vm_flags);*/
+  /*}*/
+/*}*/
+
+probe kernel.function("__get_user_pages").return
+{
+  printf("__get_user_pages return %d\n", $return);
+}
+
+/* This will cause too many output, use the one in below instead
+probe module("vfio_iommu_type1").function("is_invalid_reserved_pfn").return
+{
+  printf("---pfn(%ld)_is_invalid = %d\n", @entry($pfn), $return);
+}
+*/
+
+/* the line "if (is_invalid_reserved_pfn(*pfn))" */
+probe module("vfio_iommu_type1").statement("vaddr_get_pfn@drivers/vfio/vfio_iommu_type1.c:382")
+{
+  printf("vaddr_get_pfn $vma %p\n", $vma);
+  if ( $vma ) {
+  printf("--vm_flags 0x%lx\n", $vma->vm_flags);
+  printf("--pfn at %ld", kernel_long($pfn));
+  }
+  // %{ print("is_invalid = %d", is_invalid_reserved_pfn(*pfn)) %}
+}
+
+probe module("vfio_iommu_type1").function("vaddr_get_pfn").return
+{
+  printf("vadr_get_pfn returns %d\n", $return);
+}
+
+probe kernel.function("find_extend_vma")
+{
+printf("find_extend_vma addr %lx\n", $addr);
+}
+
+probe kernel.function("find_extend_vma").return
+{
+printf("find_extend_vma return %s\n", $$return);
+}
+
+probe kernel.function("get_gate_page")
+{
+printf("get_gate_page\n");
+}
+
+probe kernel.function("check_vma_flags")
+{
+printf("check_vma_flags\n");
+}

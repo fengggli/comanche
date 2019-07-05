@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <nupm/nupm.h>
+#include "dma-mapping.h"
 
 #define REDUCE_KB(X) (X >> 10)
 #define REDUCE_MB(X) (X >> 20)
@@ -53,7 +54,8 @@
 #define MAP_HUGE_1GB (30 << MAP_HUGE_SHIFT)
 
 // #define USE_AEP
-// #define USE_MCAS_MMAP
+#define USE_MCAS_MMAP
+#define USE_SPDK_REGISTER
 
 static constexpr uint64_t TOKEN = 0xFEEB;
 static constexpr size_t k_region_size = MB(2);
@@ -192,7 +194,14 @@ void Main::run(){
       PLOG(" press return to register io mem");
       getchar();
 
+#ifndef USE_SPDK_REGISTER
+      int vfio_container = find_vfio_fd();
+      PINF("trying to register with vfio fd = %d", vfio_container);
+      rc = comanche_dma_register(ptr, k_region_size, vfio_container);
+#else
       rc = spdk_mem_register(ptr, k_region_size);
+#endif
+
       if(rc != 0)
         PERR("memory register failed failed with rc %d", rc);
     }
@@ -207,7 +216,16 @@ void Main::run(){
   // if register the memory from producer without going through mcas
   PLOG(" press return to register io mem");
   getchar();
-  rc = spdk_mem_register(ptr, k_region_size);
+
+#ifndef USE_SPDK_REGISTER
+      int vfio_container = find_vfio_fd();
+      PINF("trying to register with vfio fd = %d", vfio_container);
+      rc = comanche_dma_register(ptr, k_region_size, vfio_container);
+#else
+      rc = spdk_mem_register(ptr, k_region_size);
+#endif
+
+  // rc = spdk_mem_register(ptr, k_region_size);
   if(rc != 0)
     PERR("memory register failed failed with rc %d", rc);
 #endif
