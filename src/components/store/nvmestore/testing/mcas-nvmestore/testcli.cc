@@ -128,8 +128,13 @@ void Main::run(){
   void * pm_addr = ((void*) 0x900000000);
   
 #ifdef USE_AEP
-  nupm::Devdax_manager pm({{"/dev/dax1.0", ((uint64_t)pm_addr), 0}}, true);
-  ptr = pm.create_region(1, 0, size);
+  nupm::Devdax_manager::config_t config;
+  config.path = "/dev/dax0.0";
+  config.addr = 0x900000000;
+  config.region_id = 0;
+
+  nupm::Devdax_manager ddm({config},true);
+  ptr = ddm.create_region(1, 0, size);
 #else
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
   flags |= MAP_HUGETLB | MAP_HUGE_2MB; // | MAP_FIXED;
