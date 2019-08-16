@@ -63,26 +63,24 @@ class bitmap_ikv {
   ~bitmap_ikv(){};
 
   /** Load bitmap from ikvstore*/
-  status_t load(IKVStore::key_t& out_lockkey)
+  status_t load()
   {
     void*           ptr2bitmap;
-    IKVStore::key_t lock_key;
     size_t          bitmap_len = BITMAP_CHUNCK_SIZE;
 
     if (S_OK != _store->lock(_pool, _id, IKVStore::STORE_LOCK_WRITE, ptr2bitmap,
-                             bitmap_len, lock_key)) {
+                             bitmap_len, _locked_key)) {
       throw General_exception("bitmap_ikv: intial kv lock failed");
     }
-    out_lockkey = lock_key;
     _bitdata    = reinterpret_cast<word_t*>(ptr2bitmap);
     _is_locked  = true;
     return S_OK;
   }
 
   /** Flush this bitmap chunk to ikvstore*/
-  status_t flush(IKVStore::key_t lockkey)
+  status_t flush()
   {
-    if (S_OK != _store->unlock(_pool, lockkey))
+    if (S_OK != _store->unlock(_pool, _locked_key))
       throw General_exception("bitmap_ikv: unlock failed");
     _is_locked = false;
     return S_OK;
@@ -130,6 +128,7 @@ class bitmap_ikv {
   size_t  _capacity; /** how many bit in this bitmap*/
   word_t* _bitdata   = nullptr;
   bool    _is_locked = false;
+  IKVStore::key_t _locked_key;
 };  // namespace block_alloc_ikv
 
 }  // namespace block_alloc_ikv

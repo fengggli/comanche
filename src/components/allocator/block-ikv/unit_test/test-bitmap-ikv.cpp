@@ -28,7 +28,6 @@ IKVStore::pool_t BitmapIkv_test::_pool;
 IKVStore *       BitmapIkv_test::_kvstore;
 bitmap_ikv *     BitmapIkv_test::_bitmap;
 std::string      BitmapIkv_test::_test_id = "thisistheiid";
-IKVStore::key_t  BitmapIkv_test::_lockkey;
 
 std::map<unsigned int, unsigned int> BitmapIkv_test::_regions;
 
@@ -58,7 +57,7 @@ TEST_F(BitmapIkv_test, Instantiate)
   ASSERT_TRUE(_pool > 0);
 
   _bitmap = new bitmap_ikv(_kvstore, _pool, _test_id);
-  _bitmap->load(_lockkey);
+  _bitmap->load();
   _bitmap->zero();
 }
 
@@ -101,7 +100,7 @@ TEST_F(BitmapIkv_test, Free)
 
 TEST_F(BitmapIkv_test, Finalize)
 {
-  _bitmap->flush(_lockkey);
+  _bitmap->flush();
   delete _bitmap;
   _kvstore->close_pool(_pool);
   _kvstore->release_ref();

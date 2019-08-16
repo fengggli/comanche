@@ -224,6 +224,9 @@ status_t Block_manager::do_block_io(int         type,
       break;
 
     case BLOCK_IO_READ:
+#ifdef NO_SPLIT_IO
+        _blk_dev->read(mem, 0, lba, nr_io_blocks);
+#else
 
       if (nr_io_blocks < CHUNK_SIZE_IN_BLOCKS)
         _blk_dev->read(mem, 0, lba, nr_io_blocks);
@@ -247,9 +250,13 @@ status_t Block_manager::do_block_io(int         type,
         while (!_blk_dev->check_completion(tag))
           ; /* we only have to check the last completion */
       }
+#endif
       break;
 
     case BLOCK_IO_WRITE:
+#ifdef NO_SPLIT_IO
+        _blk_dev->write(mem, 0, lba, nr_io_blocks);
+#else
       if (nr_io_blocks < CHUNK_SIZE_IN_BLOCKS)
         _blk_dev->write(mem, 0, lba, nr_io_blocks);
       else {
@@ -272,6 +279,7 @@ status_t Block_manager::do_block_io(int         type,
         while (!_blk_dev->check_completion(tag))
           ; /* we only have to check the last completion */
       }
+#endif
       break;
     default:
       throw General_exception("not implemented");

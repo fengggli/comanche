@@ -41,15 +41,16 @@ class BlockAlloc_ikv : public Component::IBlock_allocator {
     if (nbits > _bitmap->get_capacity())
       throw General_exception("single chunk is too small");
 
+    _bitmap->load();
+
     if (force_init) {
-      IKVStore::key_t lockkey;
-      _bitmap->load(lockkey);
       _bitmap->zero();
-      _bitmap->flush(lockkey);
     }
   }
 
-  virtual ~BlockAlloc_ikv() { delete _bitmap; };
+  virtual ~BlockAlloc_ikv() { 
+    _bitmap->flush();
+    delete _bitmap; };
 
   /**
    * Component/interface management
@@ -103,11 +104,8 @@ lba_t BlockAlloc_ikv::alloc(size_t count, void** handle)
   lba_t    ret_pos;
   unsigned order = size_to_bin(count) - 1;
 
-  IKVStore::key_t lockkey;
-  _bitmap->load(lockkey);
-  // TODO sth bad can happen here
+  // for hstore its fine(since memory is locked), for filestore, it's better to do a sync.
   ret_pos = _bitmap->find_free_region(order);
-  _bitmap->flush(lockkey);
 
   // form a void *
   *handle = (void*) (ret_pos << 32 | order);
@@ -129,10 +127,7 @@ void BlockAlloc_ikv::free(lba_t addr, void* handle)
         "[%s]: try to free block region using corrupted handle", __func__);
   }
 
-  IKVStore::key_t lockkey;
-  _bitmap->load(lockkey);
   _bitmap->release_region(lba_start, order);
-  _bitmap->flush(lockkey);
 }
 
 size_t   BlockAlloc_ikv::get_free_capacity() { return 0; }
